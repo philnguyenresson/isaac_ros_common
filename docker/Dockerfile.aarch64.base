@@ -27,7 +27,23 @@ RUN apt-get update && apt-get install -y \
     wget \
     libgoogle-glog-dev \
     software-properties-common \
-&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade cmake to 3.23.2
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ focal main' | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update \
+    && rm /usr/share/keyrings/kitware-archive-keyring.gpg \
+    && apt-get install -y kitware-archive-keyring \
+    && apt-get remove cmake && apt-get purge cmake && apt-get remove cmake-data && apt-get purge cmake \
+    && apt-get install -y cmake=3.23.2-0kitware1ubuntu20.04.1 cmake-data=3.23.2-0kitware1ubuntu20.04.1 \
+    && cmake --version \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set Python3 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+
 
 # Install OpenCV dependencies
 RUN apt-get update && apt-get install -y \
@@ -42,7 +58,7 @@ RUN apt-get update && apt-get install -y \
     libtiff-dev \
     pkg-config \
     yasm \
-&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Install additional packages needed for ROS2 dependencies
 RUN apt-get update && apt-get install -y \
@@ -62,14 +78,14 @@ RUN apt-get update && apt-get install -y \
     libassimp-dev \
     libyaml-cpp-dev \
     libpcap-dev \
-&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # sklearn dependencies
 RUN apt-get update && apt-get install -y \
     gfortran \
     libatlas-base-dev \
     python3-scipy \
-&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # sklearn Python dependencies
 RUN python3 -m pip install -U \
@@ -82,14 +98,14 @@ RUN python3 -m pip install -U \
 
 # Install Git-LFS
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
-        apt-get update && apt-get install -y \
-        git-lfs \
-&& rm -rf /var/lib/apt/lists/*
+    apt-get update && apt-get install -y \
+    git-lfs \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Pytorch and ONNX
 RUN wget https://nvidia.box.com/shared/static/p57jwntv436lfrd78inwl7iml6p13fzh.whl -O torch-1.8.0-cp36-cp36m-linux_aarch64.whl && \
-        apt-get update && apt-get install -y libopenblas-base libopenmpi-dev && \
-        python3 -m pip install -U numpy torch-1.8.0-cp36-cp36m-linux_aarch64.whl onnx
+    apt-get update && apt-get install -y libopenblas-base libopenmpi-dev && \
+    python3 -m pip install -U numpy torch-1.8.0-cp36-cp36m-linux_aarch64.whl onnx
 
 # Nvidia container runtime mounts cuda libraries from the host into the container, but dpkg still
 # thinks that they are not installed. Tell dpkg that these libraries are installed so VPI's
@@ -103,19 +119,19 @@ RUN curl https://repo.download.nvidia.com/jetson/jetson-ota-public.asc > /etc/ap
     && echo "deb https://repo.download.nvidia.com/jetson/t194 r32.6 main" >> /etc/apt/sources.list.d/nvidia-l4t-apt-source.list \
     && apt-get update \
     && apt-get install -y \
-        libnvvpi1 \
-        vpi1-dev
+    libnvvpi1 \
+    vpi1-dev
 
 # Install Realsense
 RUN apt update \
     && apt-key adv --keyserver keyserver.ubuntu.com --recv-key \
-            F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || \
-       apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key \
-            F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
+    F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || \
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key \
+    F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
     && add-apt-repository -y \
-            "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" -u \
+    "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" -u \
     && apt-get install -y rsync librealsense2-utils librealsense2-dev \
-&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Tao converter
 RUN mkdir -p /opt/nvidia/tao && \
@@ -155,7 +171,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     patchelf \
     rapidjson-dev \
     zlib1g-dev \
-&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/tritonserver && cd /opt/tritonserver \
     && wget https://github.com/triton-inference-server/server/releases/download/v2.13.0/tritonserver2.13.0-jetpack4.6.tgz \
@@ -196,7 +212,7 @@ RUN mkdir -p /opt/ros/foxy/src && cd /opt/ros/foxy/src \
     && git clone https://github.com/ros/resource_retriever.git && cd resource_retriever && git checkout foxy && cd .. \
     && git clone https://github.com/ros-visualization/interactive_markers.git && cd interactive_markers && git checkout foxy && cd .. \
     && git clone https://github.com/ros-perception/laser_geometry.git && cd laser_geometry && git checkout foxy && cd ..
-    
+
 # Upgrade cmake to latest
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
     && echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ bionic main' | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null \
@@ -224,7 +240,7 @@ RUN mkdir -p /opt/ros/foxy/src && cd /opt/ros/foxy/src \
 # Add MQTT binaries and libraries
 # Note: VPN cannot be on for pymongo download
 RUN python3 -m pip install -U \
-  pymongo paho-mqtt
+    pymongo paho-mqtt
 
 RUN mkdir -p /opt/ros/foxy/src && cd /opt/ros/foxy/src \
     && git clone https://github.com/ipa320/vda5050_msgs.git vda5050_root && cd vda5050_root && git checkout ros2 \
@@ -249,15 +265,15 @@ RUN apt-get update -y && add-apt-repository -y ppa:ubuntu-toolchain-r/test && ap
     gcc-8 \
     g++-8 \
     libstdc++6 \
-&& update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 8 \
-&& update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 8 \
-&& rm -rf /usr/bin/aarch64-linux-gnu-gcc /usr/bin/aarch64-linux-gnu-g++ \
+    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 8 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 8 \
+    && rm -rf /usr/bin/aarch64-linux-gnu-gcc /usr/bin/aarch64-linux-gnu-g++ \
     /usr/bin/aarch64-linux-gnu-g++-7 /usr/bin/aarch64-linux-gnu-gcc-7 \
-&& update-alternatives --install /usr/bin/aarch64-linux-gnu-gcc aarch64-linux-gnu-gcc \
+    && update-alternatives --install /usr/bin/aarch64-linux-gnu-gcc aarch64-linux-gnu-gcc \
     /usr/bin/gcc-8 8 \
-&& update-alternatives --install /usr/bin/aarch64-linux-gnu-g++ aarch64-linux-gnu-g++ \
+    && update-alternatives --install /usr/bin/aarch64-linux-gnu-g++ aarch64-linux-gnu-g++ \
     /usr/bin/g++-8 8 \
-&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 ### -----------------------------
 

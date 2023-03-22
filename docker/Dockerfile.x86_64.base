@@ -8,11 +8,13 @@
 #
 # Docker file to build on x86_64
 # https://docs.nvidia.com/deeplearning/frameworks/user-guide/index.html
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.08-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.08-py3
 FROM ${BASE_IMAGE}
 
 # disable terminal interaction for apt
 ENV DEBIAN_FRONTEND=noninteractive
+ENV SHELL /bin/bash
+SHELL ["/bin/bash", "-c"] 
 
 # NVIDIA repository keys: https://developer.nvidia.com/blog/updating-the-cuda-linux-gpg-repository-key/
 RUN apt-key del 7fa2af80 && mkdir -p /tmp && cd /tmp \
@@ -38,8 +40,11 @@ RUN apt-get update && apt-get install -y \
         vim \
         unzip \
         mlocate \
-	libgoogle-glog-dev \
-&& rm -rf /var/lib/apt/lists/*
+        libgoogle-glog-dev \
+        && rm -rf /var/lib/apt/lists/*
+
+# Set Python3 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 
 # Python basics
 RUN apt-get update && apt-get install -y \
@@ -48,7 +53,7 @@ RUN apt-get update && apt-get install -y \
         python3-pip \
         python3-pytest-cov \
         python3-setuptools \
-&& rm -rf /var/lib/apt/lists/*
+        && rm -rf /var/lib/apt/lists/*
 
 # Video utilities
 RUN apt-get update && apt-get install -y \
@@ -56,7 +61,7 @@ RUN apt-get update && apt-get install -y \
         mesa-utils \
         libcanberra-gtk-module \
         libcanberra-gtk3-module \
-&& rm -rf /var/lib/apt/lists/*
+        && rm -rf /var/lib/apt/lists/*
 
 # Core dev libraries
 RUN apt-get update && apt-get install -y \
@@ -64,16 +69,16 @@ RUN apt-get update && apt-get install -y \
         libbullet-dev \
         libtinyxml2-dev \
         libcunit1-dev \
-&& rm -rf /var/lib/apt/lists/*
+        && rm -rf /var/lib/apt/lists/*
 
 # TensorRT 8
 RUN apt-get update && apt-get install -y \
-       libnvinfer8 \
-       libnvonnxparsers8 \
-       libnvparsers8 \
-       libnvinfer-plugin8 \
-       python3-libnvinfer \
-&& rm -rf /var/lib/apt/lists/*
+        libnvinfer8 \
+        libnvonnxparsers8 \
+        libnvparsers8 \
+        libnvinfer-plugin8 \
+        python3-libnvinfer \
+        && rm -rf /var/lib/apt/lists/*
 
 # Python3 (PIP)
 RUN python3 -m pip install -U \
@@ -101,16 +106,28 @@ RUN python3 -m pip install -U \
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
         apt-get update && apt-get install -y \
         git-lfs \
-&& rm -rf /var/lib/apt/lists/*
+        && rm -rf /var/lib/apt/lists/*
 
 # Install VPI packages
-ARG HAS_GPU
-COPY vpi/*.deb /opt/install/
+# ARG HAS_GPU
+# COPY vpi/*.deb /opt/install/
+# RUN if [ "$HAS_GPU" = "true" ]; then \
+#         dpkg -i /opt/install/vpi-lib-1.1.11-cuda11-x86_64-linux.deb; \
+#         dpkg -i /opt/install/vpi-dev-1.1.11-cuda11-x86_64-linux.deb; \
+#         updatedb; \
+#         fi
+
+# Install VPI packages
+ARG HAS_GPU="true"
 RUN if [ "$HAS_GPU" = "true" ]; then \
-        dpkg -i /opt/install/vpi-lib-1.1.11-cuda11-x86_64-linux.deb; \
-        dpkg -i /opt/install/vpi-dev-1.1.11-cuda11-x86_64-linux.deb; \
-        updatedb; \
-    fi
+        set -e ; \
+        apt-key adv --fetch-key https://repo.download.nvidia.com/jetson/jetson-ota-public.asc ; \
+        add-apt-repository 'deb http://repo.download.nvidia.com/jetson/x86_64/focal r35.1 main' ; \
+        apt-get update ; \
+        apt-get install libnvvpi2 vpi2-dev ; \
+        rm -rf /var/lib/apt/lists/* ; \
+        fi
+
 
 # Setup ROS2 Foxy
 RUN locale-gen en_US en_US.UTF-8
@@ -120,7 +137,7 @@ ENV LANG=en_US.UTF-8
 RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
 RUN sh -c 'echo "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt --fix-broken install -y && apt-get install -y \
         python3-colcon-common-extensions \
         python3-rosdep \
         python3-vcstool \
@@ -137,32 +154,33 @@ RUN apt-get update && apt-get install -y \
         ros-foxy-sensor-msgs-py \
         ros-foxy-stereo-image-proc \
         ros-foxy-pcl-ros \
-&& rm -rf /var/lib/apt/lists/*
+        && rm -rf /var/lib/apt/lists/*
 
 RUN rosdep init
 
+
 # Install Realsense
 RUN apt update \
-    && apt-key adv --keyserver keys.gnupg.net --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
-    || apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
-    && add-apt-repository -y "deb https://librealsense.intel.com/Debian/apt-repo bionic main" -u \
-    && apt-get install -y librealsense2-utils librealsense2-dev
+        && apt-key adv --keyserver keys.gnupg.net --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
+        || apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
+        && add-apt-repository -y "deb https://librealsense.intel.com/Debian/apt-repo bionic main" -u \
+        && apt-get install -y librealsense2-utils librealsense2-dev
 
 # Install Tao converter
 RUN mkdir -p /opt/nvidia/tao && \
-    cd /opt/nvidia/tao && \
-    wget https://developer.nvidia.com/tao-converter-80 && \
-    unzip tao-converter-80 && \
-    chmod 755 $(find /opt/nvidia/tao -name "tao-converter") && \
-    ln -sf $(find /opt/nvidia/tao -name "tao-converter") /opt/nvidia/tao/tao-converter && \
-    rm tao-converter-80
+        cd /opt/nvidia/tao && \
+        wget https://developer.nvidia.com/tao-converter-80 && \
+        unzip tao-converter-80 && \
+        chmod 755 $(find /opt/nvidia/tao -name "tao-converter") && \
+        ln -sf $(find /opt/nvidia/tao -name "tao-converter") /opt/nvidia/tao/tao-converter && \
+        rm tao-converter-80
 
 ENV PATH="${PATH}:/opt/nvidia/tao"
 
 # Add MQTT binaries and libraries
 RUN apt-add-repository ppa:mosquitto-dev/mosquitto-ppa \
-    && apt-get update \
-    && apt-get install -y mosquitto mosquitto-clients ros-foxy-rosbridge-library
+        && apt-get update \
+        && apt-get install -y mosquitto mosquitto-clients ros-foxy-rosbridge-library
 
 RUN python3 -m pip install -U \
         paho-mqtt
@@ -183,12 +201,12 @@ ARG USER_GID=1000
 
 # Create the 'admin' user
 RUN groupmod --gid ${USER_GID} -n ${USERNAME} triton-server \
-    && usermod -l ${USERNAME} -m -d /home/${USERNAME} triton-server \
-    && mkdir -p /home/${USERNAME} \
-    && sudo chown ${USERNAME}:${USERNAME} /home/${USERNAME} \
-    && echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} \
-    && chmod 0440 /etc/sudoers.d/${USERNAME} \
-    && adduser ${USERNAME} video && adduser ${USERNAME} sudo
+        && usermod -l ${USERNAME} -m -d /home/${USERNAME} triton-server \
+        && mkdir -p /home/${USERNAME} \
+        && sudo chown ${USERNAME}:${USERNAME} /home/${USERNAME} \
+        && echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} \
+        && chmod 0440 /etc/sudoers.d/${USERNAME} \
+        && adduser ${USERNAME} video && adduser ${USERNAME} sudo
 
 # Copy scripts
 RUN mkdir -p /usr/local/bin/scripts
